@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Partituras para Principiantes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tool-btn, .modifier-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .tool-btn.active, .modifier-btn.active {
+            background-color: #3b82f6;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .modifier-btn.active {
+             background-color: #16a34a;
+        }
+        #sheet-music {
+            cursor: crosshair;
+        }
+        .note-head, .rest-symbol {
+            cursor: pointer;
+        }
+        .eraser-cursor {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L10.5 9.5l3.987 3.987 6.687-6.688Z"/><path d="m3 21 7.5-7.5"/><path d="m12.5 11.5 6-6"/></svg>'), auto;
+        }
+        .dropdown-content {
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col items-center p-4 sm:p-6">
+
+    <div class="w-full max-w-7xl bg-white rounded-xl shadow-lg p-6">
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
+            <h1 class="text-2xl font-bold text-gray-700">Editor de Partituras</h1>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <label for="tempo-input" class="font-medium text-sm text-gray-600">Tempo (BPM):</label>
+                    <input type="number" id="tempo-input" value="120" class="w-20 p-1 border rounded-md text-center">
+                </div>
+                <div class="flex items-center gap-2">
+                     <label for="time-signature-select" class="font-medium text-sm text-gray-600">Compás:</label>
+                     <select id="time-signature-select" class="p-1 border rounded-md bg-white">
+                         <option value="4/4">4/4</option>
+                         <option value="3/4">3/4</option>
+                         <option value="2/4">2/4</option>
+                     </select>
+                </div>
+            </div>
+        </header>
+
+        <!-- Toolbar -->
+        <div class="p-4 mb-6 bg-gray-50 rounded-lg border flex flex-wrap gap-3 justify-center items-center">
+            <!-- Dropdown de Figuras -->
+            <div class="relative dropdown-container">
+                <button id="figures-dropdown-btn" class="flex items-center gap-2 px-4 py-2 bg-white border rounded-lg shadow-sm font-medium">
+                    <span id="active-figure-icon" class="text-2xl">♩</span>
+                    <span>Figuras</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div id="figures-dropdown" class="dropdown-content hidden absolute z-10 mt-2 w-auto bg-white rounded-lg shadow-xl p-2 grid grid-cols-2 gap-2">
+                    <button id="whole-note" class="tool-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><span class="text-3xl">𝅗</span><span class="text-xs font-medium">Redonda</span></button>
+                    <button id="half-note" class="tool-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><svg class="w-8 h-8" viewBox="0 0 20 38"><circle cx="10" cy="32" r="6" stroke="black" stroke-width="1.5" fill="white"/><line x1="16" y1="32" x2="16" y2="2" stroke="black" stroke-width="1.5"/></svg><span class="text-xs font-medium">Blanca</span></button>
+                    <button id="quarter-note" class="tool-btn active flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><span class="text-3xl">♩</span><span class="text-xs font-medium">Negra</span></button>
+                    <button id="eighth-note" class="tool-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><span class="text-3xl">♪</span><span class="text-xs font-medium">Corchea</span></button>
+                </div>
+            </div>
+
+            <!-- Dropdown de Silencios -->
+            <div class="relative dropdown-container">
+                <button id="rests-dropdown-btn" class="flex items-center gap-2 px-4 py-2 bg-white border rounded-lg shadow-sm font-medium">
+                    <span id="active-rest-icon" class="text-2xl"></span>
+                    <span>Silencios</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div id="rests-dropdown" class="dropdown-content hidden absolute z-10 mt-2 w-auto bg-white rounded-lg shadow-xl p-2 grid grid-cols-2 gap-2">
+                    <button id="whole-rest" class="tool-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><svg class="w-8 h-8" viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="5" fill="black" /></svg><span class="text-xs font-medium">Sil. Redonda</span></button>
+                    <button id="half-rest" class="tool-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><svg class="w-8 h-8" viewBox="0 0 20 20"><rect x="4" y="6" width="12" height="5" fill="black" /></svg><span class="text-xs font-medium">Sil. Blanca</span></button>
+                    <button id="quarter-rest" class="tool-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><svg class="w-8 h-8" viewBox="0 0 30 30"><path d="M10.5 6 C12 7.5 12 9 10.5 10.5 C9 12 7.5 12 6 10.5 C9 13.5 9 15 7.5 16.5 C6 18 4.5 18 3 16.5 C6 19.5 6 21 4.5 22.5 C3 24 1.5 24 0 22.5" stroke="black" stroke-width="2" fill="none" transform="translate(8, 3)"/></svg><span class="text-xs font-medium">Sil. Negra</span></button>
+                    <button id="eighth-rest" class="tool-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><svg class="w-8 h-8" viewBox="0 0 20 30" stroke="black" fill="black"><path d="M14 5 C14 5, 10 3, 9 7 C8 11, 12 12, 12 12 L8 25" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="9" cy="7" r="3.5"/></svg><span class="text-xs font-medium">Sil. Corchea</span></button>
+                </div>
+            </div>
+
+            <!-- Dropdown de Alteraciones -->
+            <div class="relative dropdown-container">
+                 <button id="modifiers-dropdown-btn" class="flex items-center gap-2 px-4 py-2 bg-white border rounded-lg shadow-sm font-medium">
+                    <span id="active-modifier-icon" class="text-2xl"></span>
+                    <span>Alteraciones</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+                <div id="modifiers-dropdown" class="dropdown-content hidden absolute z-10 mt-2 w-auto bg-white rounded-lg shadow-xl p-2 grid grid-cols-3 gap-2">
+                     <button id="dot" class="modifier-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><span class="text-4xl font-bold text-gray-700">.</span><span class="text-xs font-medium">Puntillo</span></button>
+                    <button id="sharp" class="modifier-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><span class="text-3xl font-mono text-gray-700">#</span><span class="text-xs font-medium">Sostenido</span></button>
+                    <button id="flat" class="modifier-btn flex flex-col items-center p-2 rounded-lg border bg-white w-20 h-20 justify-center"><span class="text-3xl font-mono text-gray-700">♭</span><span class="text-xs font-medium">Bemol</span></button>
+                </div>
+            </div>
+
+            <!-- Botón de Borrar -->
+            <button id="eraser" class="tool-btn flex flex-col items-center justify-center px-4 py-2 bg-white border rounded-lg shadow-sm text-red-500 w-24 h-12">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L10.5 9.5l3.987 3.987 6.687-6.688Z"/><path d="m3 21 7.5-7.5"/><path d="m12.5 11.5 6-6"/></svg>
+                <span class="text-xs font-medium">Borrar</span>
+            </button>
+        </div>
+
+        <!-- Score Area -->
+        <div id="sheet-music" class="w-full max-w-4xl mx-auto bg-white p-8 shadow-lg relative">
+            <div id="score-container" class="flex flex-col space-y-8"></div>
+            <div id="playback-line" class="absolute bg-blue-500 w-0.5" style="display: none; top: 0; left: 0; height: 90px;"></div>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="flex justify-center items-center space-x-4 mt-6 pt-4 border-t">
+            <button id="play-btn" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-transform transform hover:scale-105">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button id="stop-btn" class="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-transform transform hover:scale-105">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sheetMusic = document.getElementById('sheet-music');
+            const scoreContainer = document.getElementById('score-container');
+            const playbackLine = document.getElementById('playback-line');
+            const tempoInput = document.getElementById('tempo-input');
+            const timeSignatureSelect = document.getElementById('time-signature-select');
+            
+            const ns = "http://www.w3.org/2000/svg";
+            const STAFF_HEIGHT = 120;
+            const STAFF_LINE_GAP = 15;
+            const STAFF_Y_START = 30;
+            const NOTE_SPACING = 38; 
+
+            let timeSignature = { beats: 4, value: 4 };
+            let score = [];
+            let activeTool = 'quarter-note';
+            let activeModifiers = { dotted: false, accidental: null };
+
+            const pitchMap = { 15: 'G5', 22.5: 'F5', 30: 'E5', 37.5: 'D5', 45: 'C5', 52.5: 'B4', 60: 'A4', 67.5: 'G4', 75: 'F4', 82.5: 'E4', 90: 'D4', 97.5: 'C4', 105: 'B3' };
+            const toolMap = {
+                'whole-note': { duration: '1n', beats: 4, type: 'note' }, 'half-note': { duration: '2n', beats: 2, type: 'note' },
+                'quarter-note': { duration: '4n', beats: 1, type: 'note' }, 'eighth-note': { duration: '8n', beats: 0.5, type: 'note' },
+                'whole-rest': { duration: '1n', beats: 4, type: 'rest' }, 'half-rest': { duration: '2n', beats: 2, type: 'rest' },
+                'quarter-rest': { duration: '4n', beats: 1, type: 'rest' }, 'eighth-rest': { duration: '8n', beats: 0.5, type: 'rest' },
+            };
+
+            const synth = new Tone.Synth().toDestination();
+            let part;
+
+            // --- UI LOGIC ---
+            function setupDropdowns() {
+                document.querySelectorAll('.dropdown-container').forEach(container => {
+                    const btn = container.querySelector('button');
+                    const dropdown = container.querySelector('.dropdown-content');
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        closeAllDropdowns(dropdown);
+                        dropdown.classList.toggle('hidden');
+                    });
+                });
+                window.addEventListener('click', () => closeAllDropdowns());
+            }
+
+            function closeAllDropdowns(except = null) {
+                document.querySelectorAll('.dropdown-content').forEach(dropdown => {
+                    if (dropdown !== except) {
+                        dropdown.classList.add('hidden');
+                    }
+                });
+            }
+
+            function updateActiveToolDisplay(toolElement) {
+                const iconHtml = toolElement.querySelector('svg, span:first-child').outerHTML;
+                const parentDropdown = toolElement.closest('.dropdown-content');
+                let displayIcon;
+
+                if (parentDropdown.id === 'figures-dropdown') {
+                    displayIcon = document.getElementById('active-figure-icon');
+                } else if (parentDropdown.id === 'rests-dropdown') {
+                    displayIcon = document.getElementById('active-rest-icon');
+                }
+                
+                if(displayIcon) {
+                    displayIcon.innerHTML = iconHtml;
+                    if(displayIcon.id.includes('figure')) document.getElementById('active-rest-icon').innerHTML = '';
+                    else document.getElementById('active-figure-icon').innerHTML = '';
+                }
+            }
+
+
+            // --- DRAWING LOGIC ---
+            function createStaff(isFirstStaff = false) {
+                const staffWrapper = document.createElement('div');
+                staffWrapper.className = 'relative';
+                const svg = document.createElementNS(ns, 'svg');
+                svg.setAttribute('width', '100%');
+                svg.setAttribute('height', STAFF_HEIGHT);
+                
+                const staffWidth = sheetMusic.clientWidth - 64;
+                
+                for (let i = 0; i < 5; i++) {
+                    const line = document.createElementNS(ns, 'line');
+                    const y = STAFF_Y_START + i * STAFF_LINE_GAP;
+                    line.setAttribute('x1', 0); line.setAttribute('y1', y);
+                    line.setAttribute('x2', staffWidth); line.setAttribute('y2', y);
+                    line.setAttribute('stroke', '#9ca3af'); line.setAttribute('stroke-width', '1.5');
+                    svg.appendChild(line);
+                }
+
+                let startX = 10;
+                if (isFirstStaff) {
+                    const clef = document.createElementNS(ns, 'text');
+                    clef.setAttribute('x', 10); clef.setAttribute('y', STAFF_Y_START + 4 * STAFF_LINE_GAP - 18);
+                    clef.setAttribute('font-size', '65'); clef.setAttribute('class', 'font-serif');
+                    clef.textContent = '𝄞';
+                    svg.appendChild(clef);
+                    
+                    const timeSigTop = document.createElementNS(ns, 'text');
+                    timeSigTop.setAttribute('x', 50); timeSigTop.setAttribute('y', STAFF_Y_START + 2 * STAFF_LINE_GAP - 2);
+                    timeSigTop.setAttribute('font-size', '28'); timeSigTop.setAttribute('font-family', 'serif');
+                    timeSigTop.textContent = timeSignature.beats;
+                    svg.appendChild(timeSigTop);
+
+                    const timeSigBottom = document.createElementNS(ns, 'text');
+                    timeSigBottom.setAttribute('x', 50); timeSigBottom.setAttribute('y', STAFF_Y_START + 4 * STAFF_LINE_GAP - 2);
+                    timeSigBottom.setAttribute('font-size', '28'); timeSigBottom.setAttribute('font-family', 'serif');
+                    timeSigBottom.textContent = timeSignature.value;
+                    svg.appendChild(timeSigBottom);
+                    startX = 80;
+                }
+                
+                staffWrapper.appendChild(svg);
+                scoreContainer.appendChild(staffWrapper);
+                return { svg, startX, staffWidth };
+            }
+
+            function redrawScore() {
+                scoreContainer.innerHTML = '';
+                if (score.length === 0) {
+                    createStaff(true);
+                    return;
+                }
+
+                let { svg, startX, staffWidth } = createStaff(true);
+                let currentX = startX;
+                let currentMeasureBeatCount = 0;
+                let transportTime = 0;
+                let staffIndex = 0;
+
+                score.forEach((item, index) => {
+                    item.id = `item-${index}`;
+                    const itemInfo = toolMap[item.tool];
+                    let itemDurationBeats = itemInfo.beats * (item.dotted ? 1.5 : 1);
+
+                    if (currentX + NOTE_SPACING > staffWidth) {
+                        drawBarLine(svg, currentX - NOTE_SPACING/2);
+                        ({ svg, startX, staffWidth } = createStaff(false));
+                        currentX = startX;
+                        staffIndex++;
+                    }
+                    
+                    if (currentMeasureBeatCount > 0 && currentMeasureBeatCount + itemDurationBeats > timeSignature.beats) {
+                        drawBarLine(svg, currentX - NOTE_SPACING/2);
+                        currentMeasureBeatCount = 0;
+                    }
+                    
+                    item.x = currentX;
+                    item.staffIndex = staffIndex;
+                    if (item.type === 'note') drawNote(svg, item, currentX);
+                    else if (item.type === 'rest') drawRest(svg, item, currentX);
+                    
+                    let toneDuration = itemInfo.duration;
+                    if (item.dotted) toneDuration += '.';
+                    item.time = transportTime;
+                    transportTime += Tone.Time(toneDuration).toSeconds();
+
+                    currentX += NOTE_SPACING;
+                    currentMeasureBeatCount += itemDurationBeats;
+
+                    if (currentMeasureBeatCount >= timeSignature.beats) {
+                        drawBarLine(svg, currentX - NOTE_SPACING/2);
+                        currentMeasureBeatCount = 0;
+                    }
+                });
+                attachItemListeners();
+            }
+            
+            function drawBarLine(svg, x) {
+                const barLine = document.createElementNS(ns, 'line');
+                barLine.setAttribute('x1', x); barLine.setAttribute('y1', STAFF_Y_START);
+                barLine.setAttribute('x2', x); barLine.setAttribute('y2', STAFF_Y_START + 4 * STAFF_LINE_GAP);
+                barLine.setAttribute('stroke', '#374151');
+                barLine.setAttribute('stroke-width', '2');
+                svg.appendChild(barLine);
+            }
+
+            function drawNote(svg, item, x) {
+                const y = parseFloat(Object.keys(pitchMap).find(key => pitchMap[key] === item.pitch));
+                if (isNaN(y)) return;
+
+                const noteGroup = document.createElementNS(ns, 'g');
+                noteGroup.setAttribute('class', 'note-head');
+                noteGroup.dataset.itemId = item.id;
+                
+                let headX = x;
+                if (item.accidental) {
+                    const accidentalSymbol = document.createElementNS(ns, 'text');
+                    accidentalSymbol.setAttribute('x', x - 12);
+                    accidentalSymbol.setAttribute('y', y + 5);
+                    accidentalSymbol.setAttribute('font-size', '28');
+                    accidentalSymbol.textContent = item.accidental === 'sharp' ? '#' : '♭';
+                    noteGroup.appendChild(accidentalSymbol);
+                    headX += 10;
+                }
+
+                const head = document.createElementNS(ns, 'ellipse');
+                head.setAttribute('cx', headX); head.setAttribute('cy', y);
+                head.setAttribute('rx', 7.5); head.setAttribute('ry', 6);
+                const isHollow = item.tool === 'half-note' || item.tool === 'whole-note';
+                head.setAttribute('fill', isHollow ? 'none' : 'black');
+                head.setAttribute('stroke', 'black');
+                head.setAttribute('stroke-width', '1.5');
+                noteGroup.appendChild(head);
+
+                if (item.tool !== 'whole-note') {
+                    const isUp = y > STAFF_Y_START + 2 * STAFF_LINE_GAP;
+                    const stem = document.createElementNS(ns, 'line');
+                    stem.setAttribute('x1', headX + (isUp ? -7 : 7)); stem.setAttribute('y1', y);
+                    stem.setAttribute('x2', headX + (isUp ? -7 : 7)); stem.setAttribute('y2', y + (isUp ? -35 : 35));
+                    stem.setAttribute('stroke', 'black'); stem.setAttribute('stroke-width', '1.5');
+                    noteGroup.appendChild(stem);
+
+                    if (item.tool === 'eighth-note') {
+                        const flag = document.createElementNS(ns, 'path');
+                        const flagX = headX + (isUp ? -7 : 7);
+                        const flagY = y + (isUp ? -35 : 35);
+                        flag.setAttribute('d', `M${flagX} ${flagY} Q ${flagX + 10} ${flagY + (isUp ? 5 : -5)}, ${flagX} ${flagY + (isUp ? 15 : -15)}`);
+                        flag.setAttribute('stroke', 'black'); flag.setAttribute('stroke-width', '2');
+                        flag.setAttribute('fill', 'none');
+                        noteGroup.appendChild(flag);
+                    }
+                }
+
+                if (item.dotted) {
+                    const dot = document.createElementNS(ns, 'circle');
+                    dot.setAttribute('cx', headX + 12); dot.setAttribute('cy', y);
+                    dot.setAttribute('r', '2.5'); dot.setAttribute('fill', 'black');
+                    noteGroup.appendChild(dot);
+                }
+                svg.appendChild(noteGroup);
+            }
+
+            function drawRest(svg, item, x) {
+                 const restGroup = document.createElementNS(ns, 'g');
+                restGroup.setAttribute('class', 'rest-symbol');
+                restGroup.dataset.itemId = item.id;
+                let restSymbol;
+
+                switch (item.tool) {
+                    case 'whole-rest': restSymbol = document.createElementNS(ns, 'rect'); restSymbol.setAttribute('x', x - 6); restSymbol.setAttribute('y', STAFF_Y_START + STAFF_LINE_GAP); restSymbol.setAttribute('width', '12'); restSymbol.setAttribute('height', '5'); break;
+                    case 'half-rest': restSymbol = document.createElementNS(ns, 'rect'); restSymbol.setAttribute('x', x - 6); restSymbol.setAttribute('y', STAFF_Y_START + 2 * STAFF_LINE_GAP - 5); restSymbol.setAttribute('width', '12'); restSymbol.setAttribute('height', '5'); break;
+                    case 'quarter-rest': restSymbol = document.createElementNS(ns, 'path'); restSymbol.setAttribute('d', 'M10.5 6 C12 7.5 12 9 10.5 10.5 C9 12 7.5 12 6 10.5 C9 13.5 9 15 7.5 16.5 C6 18 4.5 18 3 16.5 C6 19.5 6 21 4.5 22.5 C3 24 1.5 24 0 22.5'); restSymbol.setAttribute('stroke', 'black'); restSymbol.setAttribute('stroke-width', '2'); restSymbol.setAttribute('fill', 'none'); restSymbol.setAttribute('transform', `translate(${x - 5}, ${STAFF_Y_START - 5}) scale(1.2)`); break;
+                    case 'eighth-rest':
+                        restSymbol = document.createElementNS(ns, 'g');
+                        restSymbol.setAttribute('transform', `translate(${x - 10}, ${STAFF_Y_START + 5})`);
+                        const restPath = document.createElementNS(ns, 'path'); restPath.setAttribute('d', 'M14 5 C14 5, 10 3, 9 7 C8 11, 12 12, 12 12 L8 25'); restPath.setAttribute('stroke', 'black'); restPath.setAttribute('stroke-width', '2'); restPath.setAttribute('stroke-linecap', 'round'); restPath.setAttribute('fill', 'none');
+                        const restHead = document.createElementNS(ns, 'circle'); restHead.setAttribute('cx', '9'); restHead.setAttribute('cy', '7'); restHead.setAttribute('r', '3.5'); restHead.setAttribute('fill', 'black');
+                        restSymbol.appendChild(restPath); restSymbol.appendChild(restHead);
+                        break;
+                }
+                
+                if (restSymbol) {
+                    if (item.tool.includes('rest') && (item.tool === 'whole-rest' || item.tool === 'half-rest')) restSymbol.setAttribute('fill', 'black');
+                    restGroup.appendChild(restSymbol);
+                    if (item.dotted) {
+                        const dot = document.createElementNS(ns, 'circle'); dot.setAttribute('cx', x + 12); dot.setAttribute('cy', STAFF_Y_START + 2 * STAFF_LINE_GAP); dot.setAttribute('r', '2.5'); dot.setAttribute('fill', 'black');
+                        restGroup.appendChild(dot);
+                    }
+                    svg.appendChild(restGroup);
+                }
+            }
+
+            // --- INTERACTION LOGIC ---
+            function setActiveTool(toolId, toolElement) {
+                sheetMusic.classList.toggle('eraser-cursor', toolId === 'eraser');
+                activeTool = toolId;
+                document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+                
+                if (toolId !== 'eraser') {
+                    toolElement.classList.add('active');
+                    updateActiveToolDisplay(toolElement);
+                } else {
+                     document.getElementById('eraser').classList.add('active');
+                     document.getElementById('active-figure-icon').innerHTML = '';
+                     document.getElementById('active-rest-icon').innerHTML = '';
+                }
+                closeAllDropdowns();
+            }
+
+            function toggleModifier(modifierId) {
+                const btn = document.getElementById(modifierId);
+                const isCurrentlyActive = btn.classList.contains('active');
+
+                if (modifierId === 'dot') {
+                    btn.classList.toggle('active');
+                    activeModifiers.dotted = !isCurrentlyActive;
+                } else { // sharp or flat
+                    document.getElementById('sharp').classList.remove('active');
+                    document.getElementById('flat').classList.remove('active');
+                    
+                    if (isCurrentlyActive) {
+                        activeModifiers.accidental = null;
+                    } else {
+                        btn.classList.add('active');
+                        activeModifiers.accidental = modifierId;
+                    }
+                }
+                closeAllDropdowns();
+            }
+
+            sheetMusic.addEventListener('click', (e) => {
+                if (activeTool === 'eraser' || !e.target.closest('svg')) return;
+                
+                const svg = e.target.closest('svg');
+                const rect = svg.getBoundingClientRect();
+                const y = e.clientY - rect.top;
+                
+                const toolInfo = toolMap[activeTool];
+                const newItem = { tool: activeTool, type: toolInfo.type, ...activeModifiers };
+                
+                if (newItem.type === 'note') {
+                    const closestY = Object.keys(pitchMap).reduce((p, c) => (Math.abs(c - y) < Math.abs(p - y) ? c : p));
+                    newItem.pitch = pitchMap[closestY];
+                }
+
+                score.push(newItem);
+                redrawScore();
+
+                if (activeModifiers.accidental) {
+                    document.getElementById(activeModifiers.accidental).classList.remove('active');
+                    activeModifiers.accidental = null;
+                }
+            });
+            
+            function attachItemListeners() {
+                document.querySelectorAll('.note-head, .rest-symbol').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const itemIndex = parseInt(el.dataset.itemId.split('-')[1]);
+                        if (isNaN(itemIndex)) return;
+
+                        if (activeTool === 'eraser') {
+                            score.splice(itemIndex, 1);
+                            redrawScore();
+                        } else {
+                            const item = score[itemIndex];
+                            if (item) {
+                                startPlayback(item.time);
+                            }
+                        }
+                    });
+                });
+            }
+
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.addEventListener('click', () => setActiveTool(btn.id, btn)));
+            document.querySelectorAll('.modifier-btn').forEach(btn => btn.addEventListener('click', () => toggleModifier(btn.id)));
+            
+            // --- PLAYBACK & SETTINGS LOGIC ---
+            function startPlayback(startTime = 0) {
+                if (Tone.context.state !== 'running') Tone.start();
+                if (score.length === 0) return;
+                
+                Tone.Transport.stop();
+                if (part) part.dispose();
+                Tone.Transport.cancel();
+                
+                const events = score.map(item => {
+                    const toolInfo = toolMap[item.tool];
+                    let duration = toolInfo.duration;
+                    if (item.dotted) duration += '.';
+                    
+                    let pitch = null;
+                    if (item.type === 'note') {
+                        pitch = item.pitch.slice(0, 1) + (item.accidental === 'sharp' ? '#' : item.accidental === 'flat' ? 'b' : '') + item.pitch.slice(-1);
+                    }
+                    
+                    return { time: item.time, note: pitch, duration: duration, x: item.x, staffIndex: item.staffIndex };
+                });
+
+                part = new Tone.Part((time, value) => {
+                    if (value.note) synth.triggerAttackRelease(value.note, value.duration, time);
+                    requestAnimationFrame(() => {
+                        const staffWrapper = scoreContainer.children[value.staffIndex];
+                        if (!staffWrapper) return;
+                        const staffTop = staffWrapper.offsetTop;
+                        playbackLine.style.top = `${staffTop}px`;
+                        playbackLine.style.left = `${value.x + 32}px`;
+                    });
+                }, events).start(0, startTime);
+                
+                Tone.Transport.on('start', () => playbackLine.style.display = 'block');
+                Tone.Transport.on('stop', () => {
+                    playbackLine.style.display = 'none';
+                    playbackLine.style.left = '0px';
+                });
+                
+                Tone.Transport.start();
+            }
+            
+            function updateTempo() {
+                const newTempo = parseInt(tempoInput.value);
+                if (newTempo > 0) {
+                    Tone.Transport.bpm.value = newTempo;
+                }
+            }
+
+            function updateTimeSignature() {
+                const [beats, value] = timeSignatureSelect.value.split('/');
+                timeSignature = {
+                    beats: parseInt(beats),
+                    value: parseInt(value)
+                };
+                score = []; // Clear score when time signature changes
+                redrawScore();
+            }
+
+            document.getElementById('play-btn').addEventListener('click', () => startPlayback(0));
+            document.getElementById('stop-btn').addEventListener('click', () => Tone.Transport.stop());
+            tempoInput.addEventListener('input', updateTempo);
+            timeSignatureSelect.addEventListener('change', updateTimeSignature);
+
+            // --- INITIALIZATION ---
+            setupDropdowns();
+            updateTempo();
+            redrawScore();
+            window.addEventListener('resize', redrawScore);
+            console.log("Script loaded and parsed successfully.");
+        });
+    </script>
+</body>
+</html>
